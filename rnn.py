@@ -20,7 +20,7 @@ class SimpleRnn(nn.Module):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
 
-        # 一个embedding层
+        # 一个embedding层  input_size为可能的input种类数量，把input变成单位矩阵的行向量
         self.embedding = nn.Embedding(input_size, hidden_size)
 
         ##
@@ -72,23 +72,21 @@ class SimpleRnn(nn.Module):
 # 首先生成01字符串类的数据以及样本的数量
 train_set = []
 validset = []
-sample = 2000
+sample = 1000
 
 # 训练样本中最大的n值
 sz = 10
-
 # 定义n的不同权重，我们按照10:6:4:3:1:1....来配置n=1，2，3，4，5
-probablity = 1.0 * np.array([10, 6, 4, 3, 1, 1, 1, 1, 1, 1])
-
+# probablity = np.array([10, 6, 4, 3, 1, 1, 1, 1, 1, 1])
+probablity = np.ones(sz)
 # 保证n的最大值是sz
 probablity = probablity[:sz]
-
 # 归一化，将权重变成概率
 probablity = probablity / sum(probablity)
 
 # 开始生成sample这么多个样本,
 # 每一个样本的长度是根据概率来定义的
-for m in range(2000):
+for m in range(sample):
     # 对于随机生成的字符串，随机选择一个n，n被选择的权重记录在probablity
     # n表示长度
     # range生成序列，p表示通过之前定义的probablity的概率分布进行抽样
@@ -120,12 +118,12 @@ for m in range(2):
 # 输入的size是4，可能的值为0,1,2,3
 # 输出size为3 可能为 0,1 2
 
-rnn = SimpleRnn(input_size=4, hidden_size=2, output_size=3)
+rnn = SimpleRnn(input_size=4, hidden_size=10, output_size=3, num_layers=2)
 criterion = torch.nn.NLLLoss()  # 定义交叉熵函数
 optimizer = torch.optim.Adam(rnn.parameters(), lr=0.001)  # 采用Adam算法
 
-# 重复进行50次试验
-num_epoch = 50
+# 重复进行10次试验
+num_epoch = 5
 results = []
 for epoch in range(num_epoch):
     train_loss = 0
@@ -137,15 +135,13 @@ for epoch in range(num_epoch):
         # 对于每一个序列的所有字符进行循环
         for t in range(len(seq) - 1):
             # 当前字符作为输入，下一个字符作为标签
-            x = Variable(torch.LongTensor([seq[t]]).unsqueeze(0))
-            # x的size为 batch_size=1。time_steps=1，data_dimension = 1
-            y = Variable(torch.LongTensor([seq[t + 1]]))
-            # y的size batch_size =1 data_dimension =1
-            output, hidden = rnn(x, hidden)
-            # print(x.size())
-            # output 的size：batch_size,output_size=3
-            # hidden尺寸 layer_size = 1,batch_size = 1,hidden_size
-            loss += criterion(output, y)
+            x = Variable(torch.LongTensor([seq[t]]).unsqueeze(0)) # x的size为 batch_size=1。time_steps=1，data_dimension = 1
+            y = Variable(torch.LongTensor([seq[t + 1]])) # y的size batch_size =1 data_dimension =1
+            if seq[t + 1] == 1 and seq[t] == 0: # 这一项是不可预测的
+                y = Variable(torch.LongTensor([0]))
+            output, hidden = rnn(x, hidden) # output 的size：batch_size,output_size=3  hidden尺寸 layer_size = 1,batch_size = 1,hidden_size
+            loss_weight = 3 if y.item() == 2 else 1 # 让网络更专注于难学易错的最后一项2
+            loss += criterion(output, y) * loss_weight
 
         # 计算每一个字符的损失数值
         loss = 1.0 * loss / len(seq)
@@ -155,7 +151,7 @@ for epoch in range(num_epoch):
         train_loss += loss
 
         # 打印结果
-        if i > 0 and i % 500 == 0:
+        if i > 0 and i % 100 == 0:
             print('第{}轮，第{}个，训练平均loss：{:.2f}'.format(epoch, i, train_loss.data.numpy() / i))
 
     # 下面在校验集上进行测试
@@ -173,9 +169,11 @@ for epoch in range(num_epoch):
         for t in range(len(seq) - 1):
             x = Variable(torch.LongTensor([seq[t]]).unsqueeze(0))
             y = Variable(torch.LongTensor([seq[t + 1]]))
+            if seq[t + 1] == 1 and seq[t] == 0: # 这一项是不可预测的
+                y = Variable(torch.LongTensor([0]))
             output, hidden = rnn(x, hidden)
             data = output.data.numpy()
-            print("the output is ", data)
+            # print("the output is ", data)
             # 获取最大概率输出
             mm = torch.max(output, 1)[1][0]
             # 以字符的形式添加到outputstring中
@@ -195,15 +193,16 @@ for epoch in range(num_epoch):
             show_out_t += targets
         # print("the show output is: ", show_out_p)
         # print("the show taget is: ", show_out_t)
-        print("the show input is: ", instring)
+        print("the show input is:  ", instring)
         print("the show output is: ", outstring)
         print("the show target is: ", targets)
-        # 打印结果
-        # print(output[0][2].data.numpy())
-        print('第{}轮，训练loss: {:.2f},校验loss：{:.2f},错误率：{:.2f}'.format(epoch, train_loss.data.numpy() / len(train_set),
-                                                                    valid_loss.data.numpy() / len(validset)
-                                                                    , 1.0 * errors / len(validset)))
-        results.append(
-            [train_loss.data.numpy() / len(train_set), valid_loss / len(train_set), 1.0 * errors / len(validset)])
+        print()
+
+    # 打印结果
+    print('第{}轮，训练loss: {:.2f},校验loss：{:.2f},错误率：{:.2f}'.format(epoch, train_loss.data.numpy() / len(train_set),
+                                                                valid_loss.data.numpy() / len(validset)
+                                                                , 1.0 * errors / len(validset)))
+    results.append(
+        [train_loss.data.numpy() / len(train_set), valid_loss / len(train_set), 1.0 * errors / len(validset)])
 
 
