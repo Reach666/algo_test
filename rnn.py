@@ -132,7 +132,7 @@ for epoch in range(num_epoch):
     for i, seq in enumerate(train_set):
         loss = 0
         hidden = rnn.initHidden()  # 初始化隐含层的神经元、
-        # 对于每一个序列的所有字符进行循环
+        # 对于每一个序列的所有字符进行循环  实际上可以一次性输入整个序列，RNN内部会自动迭代处理
         for t in range(len(seq) - 1):
             # 当前字符作为输入，下一个字符作为标签
             x = Variable(torch.LongTensor([seq[t]]).unsqueeze(0)) # x的size为 batch_size=1。time_steps=1，data_dimension = 1
