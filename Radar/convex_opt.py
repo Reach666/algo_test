@@ -3,20 +3,23 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Problem data.
-N = 64
-M = 8
-L = 50
+N = 64 # 被压缩的空间大小(到达角细分数)
+M = 8  # 天线数量
+L = 10 # 时序采样数
 np.random.seed(1)
 # A = np.random.randn(M, N)
-# b = np.random.randn(M)
+# b = np.random.randn(M, L)
+
 m = np.arange(M).reshape(-1,1)
 w = (2 * np.pi * np.arange(N) / N)
 A = np.exp(1j * w * m)
 x_true = np.zeros([N,L])*1j
-x_true[0*8+0] = 1 #np.random.randn(L)*1
-x_true[1*8-2] = 0.5 #np.random.randn(L)*0.6+0.0j
+x_true[0*8+0] = 1
+x_true[1*8-2] = 0.5
+# x_true[0*8+0] = np.random.randn(L)/60 + 1
+# x_true[1*8-2] = np.random.randn(L)/30 + 0.5
 noise = (np.random.randn(M,L)+1j*np.random.randn(M,L))/100
-noise = 0
+# noise = 0
 b = A @ x_true + noise
 
 # N_true = N*4
@@ -34,7 +37,7 @@ gamma = cvx.Parameter(nonneg=True)
 # Construct the problem.
 x = cvx.Variable((N,L))
 error = cvx.sum_squares(A @ x - b)
-obj = cvx.Minimize(error + gamma * cvx.norm(cvx.norm(x,2,axis=1), 1))
+obj = cvx.Minimize(error + gamma * cvx.norm(cvx.norm(x,2,axis=1), 1)) # solve better but hard
 # obj = cvx.Minimize(error + gamma * cvx.norm(cvx.norm(x,1,axis=0), 2))
 prob = cvx.Problem(obj)
 
@@ -42,12 +45,11 @@ prob = cvx.Problem(obj)
 sq_penalty = []
 l1_penalty = []
 x_values = []
-gamma_vals = np.logspace(-4, 6) #-4,6
+gamma_vals = np.logspace(-4, 4, 20) # np.logspace(-4, 5)
 for val in gamma_vals:
     gamma.value = val
     prob.solve(verbose=False)
-    # Use expr.value to get the numerical value of
-    # an expression in the problem.
+    # Use expr.value to get the numerical value of an expression in the problem.
     sq_penalty.append(error.value)
     l1_penalty.append(cvx.norm(x, 1).value)
     x_values.append(x.value)
@@ -55,7 +57,7 @@ for val in gamma_vals:
 
 # Plot trade-off curve.
 plt.subplot(121)
-plt.plot(l1_penalty, sq_penalty)
+plt.plot(l1_penalty, sq_penalty, '-*')
 plt.xlabel(r'|x|_1', fontsize=16)
 plt.ylabel(r'|Ax-b|^2', fontsize=16)
 plt.title('Trade-Off Curve for LASSO', fontsize=16)
