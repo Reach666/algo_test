@@ -45,7 +45,7 @@ assert chirpN % TxN == 0 and chirpN % len(TxDM_pattern) == 0
 chirpN_DM = chirpN // TxN
 
 # 功率参数
-# noise_power = -55 # -50dbm
+# noise_power_dbm = -55
 Pt = 10000
 
 # 目标状态
@@ -117,7 +117,7 @@ frame_data += noise
 
 import matplotlib.pyplot as plt
 if TxDM_mode == 'TDM':
-    frame_data_ = frame_data.reshape(4,-1,4,256)#.swapaxes(1,2)
+    frame_data_ = frame_data.reshape(RxN,chirpN_DM,TxN,rangeN)#.swapaxes(1,2)
     plt.imshow(abs(np.fft.fftshift(np.fft.fftn(frame_data_[0, :, 0, :]),axes=(-2,))))
 else:
     frame_data_ = frame_data
