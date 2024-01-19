@@ -85,7 +85,7 @@ def load_dataset():
     # target = torch.zeros(data.shape[:-1])
     # target[:,:2*N_] = 1
 
-    # # 生成带关联点对的数据     # Acc   FC: 58.4%   PointNet(avg): 58.4%   Transformer: 59.3%(会过拟合)  PointWiseNet: 59.6%  PointWiseNet3: 100%(顿悟)
+    # # 生成带关联三点对的数据     # Acc   FC: 58.4%   PointNet(avg): 58.4%   Transformer: 59.3%(会过拟合)  PointWiseNet: 59.6%  PointWiseNet3: 100%(顿悟)
     # N = 18
     # data = torch.rand(B, N, 3)
     # N_ = N // 6
@@ -246,8 +246,9 @@ class PointPairwiseRelation(nn.Module):
         Output:
             [B, N, Co]
     """
-    def __init__(self,C=16,Co=16):
+    def __init__(self,C=16,Co=16,rela=True):
         super().__init__()
+        self.rela = rela
         self.Co = Co
         self.fc = nn.Sequential(
             nn.Linear(C * 2, Co),
@@ -265,8 +266,9 @@ class PointPairwiseRelation(nn.Module):
         xq = F.pad(xq, (0, C), mode='constant', value=0)
         xk = F.pad(xk, (C, 0), mode='constant', value=0)
         x_pw = xq + xk  # (B,N,Nk,C*2)
-        x_pw[..., C:] = x_pw[..., C:] - x_pw[..., :C] # xk相对xq的特征
-        # x_pw[..., 0] = torch.norm(x_pw[..., C:],dim=-1) ** 2
+        if self.rela:
+            x_pw[..., C:] = x_pw[..., C:] - x_pw[..., :C] # xk相对xq的特征
+            # x_pw[..., 0] = torch.norm(x_pw[..., C:],dim=-1) ** 2
         x_pw = self.fc(x_pw)  # (B,N,Nk,Co)
         pw_max = torch.max(x_pw[...,:Co//2], dim=2).values # (B,N,Co//2)
         pw_avg = torch.mean(x_pw[...,Co//2:], dim=2) # (B,N,Co//2)
@@ -405,10 +407,10 @@ class LitNN(pl.LightningModule):
     def __init__(self,example_input_array=torch.Tensor(1, 100, 6)):
         super().__init__()
         # self.model = FCNet()
-        self.model = PointNet()
+        # self.model = PointNet()
         # self.model = PointAttentionNet()
         # self.model = PointTransformerNet()
-        # self.model = PointPairwiseRelationNet()
+        self.model = PointPairwiseRelationNet()
         # self.model = torch.compile(self.model)
 
         self.criterion = nn.NLLLoss()

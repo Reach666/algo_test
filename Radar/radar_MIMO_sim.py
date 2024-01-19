@@ -103,9 +103,9 @@ Ar = np.sqrt(Pr) # (TxN,RxN,chirpN,1,targetN)
 # 合成雷达信号
 t = np.arange(0, Ts * rangeN, Ts).reshape(rangeN,1) # (rangeN,1)
 if ComplexSignal:
-    frame_data_part = Ar * np.exp(1j * 2 * np.pi * (-fmin * tao + slope / 2 * (2 * tao * t - tao * tao))) # (TxN,RxN,chirpN,rangeN,targetN)
+    frame_data_part = Ar * np.exp(1j * 2 * np.pi * (fmin * tao + slope / 2 * (2 * tao * t - tao * tao))) # (TxN,RxN,chirpN,rangeN,targetN)
 else:
-    frame_data_part = Ar * np.cos(1j * 2 * np.pi * (-fmin * tao + slope / 2 * (2 * tao * t - tao * tao)))
+    frame_data_part = Ar * np.cos(1j * 2 * np.pi * (fmin * tao + slope / 2 * (2 * tao * t - tao * tao)))
 
 frame_data_part = np.sum(frame_data_part, axis=-1) # (TxN,RxN,chirpN,rangeN)
 frame_data_part = frame_data_part * np.tile(TxDM_pattern.T,(1,chirpN // len(TxDM_pattern))).reshape(TxN,1,chirpN,1)  # (TxN,RxN,chirpN,rangeN)

@@ -6,6 +6,10 @@ import matplotlib.pyplot as plt
 
 def pic_compress(k, pic_array):
     u, sigma, vt = np.linalg.svd(pic_array)
+    print('pic_array shape:',pic_array.shape)
+    print('u shape:', u.shape)
+    print('sigma shape:', sigma.shape)
+    print('vt shape:', vt.shape)
     plt.figure()
     plt.subplot(121)
     plt.plot(np.log(sigma))
@@ -22,7 +26,8 @@ def pic_compress(k, pic_array):
 
 
 filename = "./1.jpg"
-ori_img = np.array(imageio.imread(filename, as_gray=True))
+# ori_img = np.array(imageio.imread(filename, as_gray=True))
+ori_img = np.array(imageio.imread(filename, mode='L'))
 ori_img[100:105,100:105]=255
 ori_img[600:605,700:705]=255
 ori_img[1000:1005,100:105]=255
