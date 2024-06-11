@@ -1,9 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+IQseparate = False
 N = 128
 M = 16
-f_sub = [0,2,15,40,60]
+f_sub = [0,6,15,40,60]
 amp_sub = [2,1,2,1,10]
 s_sub = np.exp(1j * np.linspace(0,1,N) * np.array(f_sub).reshape(-1,1)) * np.array(amp_sub).reshape(-1,1)
 s = s_sub.sum(axis=0)
@@ -17,11 +18,30 @@ sfft_ = sfft.copy()
 for i in range(len(sfft)):
     i_plus = (i + M) % len(sfft)
     i_minus = i - M
-    w = np.real(-sfft[i]/(sfft[i_minus] + sfft[i_plus])) # -0.5
-    if w < 0:
-        sfft_[i] = sfft[i] + w * (sfft[i_minus] + sfft[i_plus])
-    if w < -0.5:
-        sfft_[i] = sfft[i] + -0.5 * (sfft[i_minus] + sfft[i_plus])
+    if IQseparate:
+        w_r = -sfft[i].real / (sfft[i_minus].real + sfft[i_plus].real)
+        if w_r < -0.5:
+            temp_r = sfft[i].real + -0.5 * (sfft[i_minus].real + sfft[i_plus].real)
+        elif w_r <= 0:
+            temp_r = 0
+        else:
+            temp_r = sfft[i].real
+        w_i = -sfft[i].imag / (sfft[i_minus].imag + sfft[i_plus].imag)
+        if w_i < -0.5:
+            temp_i = sfft[i].imag + -0.5 * (sfft[i_minus].imag + sfft[i_plus].imag)
+        elif w_i <= 0:
+            temp_i = 0
+        else:
+            temp_i = sfft[i].imag
+        sfft_[i] = temp_r + 1j * temp_i
+    else:
+        w = -sfft[i] / (sfft[i_minus] + sfft[i_plus])  # -0.5
+        w = w.real
+        if w < -0.5:
+            sfft_[i] = sfft[i] + -0.5 * (sfft[i_minus] + sfft[i_plus])
+            continue
+        if w <= 0:
+            sfft_[i] = sfft[i] + w * (sfft[i_minus] + sfft[i_plus])
 plt.figure()
 plt.plot(sfft.real)
 plt.plot(sfft_w.real)
