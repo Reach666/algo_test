@@ -42,23 +42,27 @@ def square_distance(src, dst) -> torch.Tensor:
 
 def load_dataset():
     B = 4096
-    # # N_density和density_ratio都设为4的情况下，难度适中     # Acc   FC: 79.6%   PointNet(max): 79.6%   PointNet(avg): 93.0%   Transformer: 94.6%(会过拟合)  PointAttentionNet: 95.3%   PointWiseNet: 98.6%
+    # # N_density和density_ratio都设为4的情况下，难度适中   两个任务叠加  # Acc   FC: 79.6%   PointNet(max): 79.6%   PointNet(avg): 93.0%   Transformer: 94.6%(会过拟合)  PointAttentionNet: 95.3%   PointWiseNet: 98.6%
     # N = 50
     # data = torch.rand(B, N, 3)
     # N_density = N // 4  # the bigger N_density, the harder
     # density_ratio = 4  # the bigger density_ratio, the easier
     # data[:, :N_density, :] = data[:, :N_density, :] / density_ratio + torch.rand(B, 1, 3) * (1 - 1 / density_ratio)
-    # sqrdists = square_distance(data, data)
+    # # sqrdists = square_distance(data, data)
     # # target = (sqrdists < 1 / density_ratio).sum(dim=-1) > N_density
     # target = torch.zeros(data.shape[:-1])
-    # target[:, :N_density] = 1   # FC: 76.0%   PointNet(max): 76.0%   PointNet(avg): 92.4%   Transformer: 95.6%  PointAttentionNet: 95.0%   PointWiseNet: 96.1%
-    # data[:, -N_density:, :] = data[:, -N_density:, :]/2
-    # target[:, -N_density:] = 1
+    # target[:, :N_density] = 1  # 这个单任务 # FC: 76.0%   PointNet(max): 76.0%   PointNet(avg): 92.4%   Transformer: 95.6%  PointAttentionNet: 95.0%   PointWiseNet: 96.1%
+    # # data[:, -N_density:, :] = data[:, -N_density:, :]/2
+    # # target[:, -N_density:] = 1
 
     # # 随机数据生成指定密度规则label，如果不知道规则的话分界线非常模糊，很难train  # Acc   FC: 76.7%   PointNet(max): 78.4%   PointNet(avg): 85%   Transformer: 90%  PointWiseNet: 90%
-    # data = torch.rand(B,100,3)
-    # sqrdists = square_distance(data, data) # (1000,100,100)
-    # target = (sqrdists < 0.1).sum(dim=-1).float() > 10
+    # # data = torch.rand(B,100,3)
+    # # sqrdists = square_distance(data, data) # (1000,100,100)
+    # # target = (sqrdists < 0.1).sum(dim=-1).float() > 10
+    # # 二维平面数据便于观察   # Acc   FC: 61.0%   PointNet(max): 61.0%   PointNet(avg): 67.4%   Transformer: 85.8%  PointWiseNet: 99.0%
+    # data = torch.cat((torch.rand(B, 100, 2), torch.zeros((B, 100, 1))), dim=2)
+    # sqrdists = square_distance(data, data)  # (1000,100,100)
+    # target = (sqrdists < 0.01).sum(dim=-1).float() > 3
 
     # # 随机数据生成指定正弦空间距离排序规则label  # Acc   FC: 95.9%   PointNet(max): 96.4%   PointNet(avg): 98.7%   Transformer: %  PointWiseNet: %
     # data = torch.rand(B,100,3)
@@ -67,8 +71,8 @@ def load_dataset():
     # target = torch.zeros(data.shape[:-1])
     # target[torch.arange(B).view(-1,1), dist.topk(k=100//2,dim=1)[1]] = 1
 
-    # # 随机数据生成指定空间点最近规则label   Acc   FC: 76.9%   PointNet(max): 92.4%   PointNet(avg): 90.6%   Transformer: %  PointWiseNet: 93.2%  @N=10
-    # Acc   FC: 80.6%   PointNet(max): 82.6%   PointNet(avg): 82.5%   @N=100    虽然PointNet(max)擅长找最值，但未必特别擅长找argmax
+    # 随机数据生成指定空间点最近规则label   Acc   FC: 76.9%   PointNet(max): 92.4%   PointNet(avg): 90.6%   Transformer: 93.8%  PointWiseNet: 93.2%  @N=10
+    # Acc   FC: 80.6%   PointNet(max): 82.6%   PointNet(avg): 82.5%   Transformer: 87.8%    PointWiseNet: 84.2%   @N=100    虽然PointNet(max)擅长找最值，但未必特别擅长找argmax
     data = torch.rand(B, 10, 3)
     rand_kernel = torch.rand(1,10 // 2,3) # 不能太多了，不然需要较大的网络规模
     dist = square_distance(data,rand_kernel.repeat(B,1,1))
@@ -96,6 +100,12 @@ def load_dataset():
 
     # b=0;plt.clf();plt.scatter(data[b,:,0],data[b,:,1],c=target[b,:]);plt.pause(2)
     # plt.clf();plt.hist((sqrdists < 1/density_ratio).sum(dim=-1)[:100].flatten());plt.pause(2)
+
+    # from mpl_toolkits.mplot3d import Axes3D
+    # b = 0; fig = plt.figure();ax = fig.add_subplot(111, projection='3d')
+    # colors = ['red' if label == 1 else 'green' for label in target[b, :]]
+    # ax.scatter(data[b, :, 0], data[b, :, 1], data[b, :, 2], c=colors)
+    # ax.set_title(f'3D Scatter Plot for Batch {b}');ax.set_xlabel('X');ax.set_ylabel('Y');ax.set_zlabel('Z');plt.tight_layout();plt.pause(1)
     data = data.float()  # data = data.double()
     target = target.long()
     dataset = TensorDataset(data, target)
@@ -165,8 +175,8 @@ class PointNet(nn.Module):
         x = x.transpose(-1,-2) # (n,point_feature_num,100,)
 
         x1 = self.conv1(x)
-        out_pool = F.max_pool1d(x1, kernel_size=(N,))
-        # out_pool = F.avg_pool1d(x1, kernel_size=(N,))
+        # out_pool = F.max_pool1d(x1, kernel_size=(N,))
+        out_pool = F.avg_pool1d(x1, kernel_size=(N,))
         # out_pool = torch.cat((F.max_pool1d(x1[:,:self.gf_num//2,:], kernel_size=(N,)),F.avg_pool1d(x1[:,self.gf_num//2:,:], kernel_size=(N,))),dim=-2)
         gf = self.conv2(out_pool)
         out = torch.cat((x, gf.repeat(1,1,N)),dim=-2)
@@ -390,7 +400,7 @@ class PointPairwiseRelationNet(nn.Module):
         self.out_fc = nn.Sequential(
             nn.Linear(Cgf, 16),
             nn.ReLU(inplace=True),
-            # nn.Dropout(0.5),
+            nn.Dropout(0.5),
             nn.Linear(16, 2),
             nn.LogSoftmax(dim=-1),
         )
@@ -407,10 +417,10 @@ class LitNN(pl.LightningModule):
     def __init__(self,example_input_array=torch.Tensor(1, 100, 6)):
         super().__init__()
         # self.model = FCNet()
-        # self.model = PointNet()
+        self.model = PointNet()
         # self.model = PointAttentionNet()
         # self.model = PointTransformerNet()
-        self.model = PointPairwiseRelationNet()
+        # self.model = PointPairwiseRelationNet()
         # self.model = torch.compile(self.model)
 
         self.criterion = nn.NLLLoss()
@@ -594,23 +604,23 @@ if __name__ == "__main__":
     val_loader = DataLoader(dataset=dataset_val, batch_size=BATCH_SIZE, drop_last=False, shuffle=False, num_workers=0) # shuffle=False
     test_loader = DataLoader(dataset=dataset_test, batch_size=BATCH_SIZE, drop_last=False, shuffle=False, num_workers=0)
 
-    model_lit = LitNN(example_input_array=dataset_train[0][0].unsqueeze(0))
-    # ckpt_path = "./checkpoints/last.ckpt"
-    # model_lit = LitNN.load_from_checkpoint(ckpt_path)
-    for batch in train_loader:
-        inputs, labels = batch
-        break
-    inputs_ = [input_[:1] for input_ in inputs] if isinstance(inputs, list) else inputs[:1]
-    from torchsummary import summary
-    summary(model_lit.model.cpu(), inputs=(inputs_,))
-    # 计算flops,但会往模型state_dict里添加total_params、total_ops等，导致load_from_checkpoint报错，因此建议放在训练保存后面
-    from thop import profile, clever_format
-    from pprint import pprint
-    macs, params, *ret_dict = profile(model_lit.model.cpu(), inputs=(inputs_,), custom_ops=None, ret_layer_info=True,
-                                      report_missing=True)
-    macs_cf, params_cf = clever_format([macs, params], "%.3f")
-    pprint(ret_dict, indent=1, depth=None, sort_dicts=False)  # depth递归深度
-    print('MACs:', int(macs), '=', macs_cf, '     Params:', int(params), '=', params_cf)
+    # model_lit = LitNN(example_input_array=dataset_train[0][0].unsqueeze(0))
+    # # ckpt_path = "./checkpoints/last.ckpt"
+    # # model_lit = LitNN.load_from_checkpoint(ckpt_path)
+    # for batch in train_loader:
+    #     inputs, labels = batch
+    #     break
+    # inputs_ = [input_[:1] for input_ in inputs] if isinstance(inputs, list) else inputs[:1]
+    # from torchsummary import summary
+    # summary(model_lit.model.cpu(), inputs=(inputs_,))
+    # # 计算flops,但会往模型state_dict里添加total_params、total_ops等，导致load_from_checkpoint报错，因此建议放在训练保存后面
+    # from thop import profile, clever_format
+    # from pprint import pprint
+    # macs, params, *ret_dict = profile(model_lit.model.cpu(), inputs=(inputs_,), custom_ops=None, ret_layer_info=True,
+    #                                   report_missing=True)
+    # macs_cf, params_cf = clever_format([macs, params], "%.3f")
+    # pprint(ret_dict, indent=1, depth=None, sort_dicts=False)  # depth递归深度
+    # print('MACs:', int(macs), '=', macs_cf, '     Params:', int(params), '=', params_cf)
 
 
     hist_dir = './lightning_history/' + time.strftime('%Y_%m_%d_%H_%M_%S')
